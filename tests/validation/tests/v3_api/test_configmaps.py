@@ -406,12 +406,12 @@ def validate_workload_with_configmap(p_client, workload,
 
     pod_list = p_client.list_pod(workloadId=workload.id).data
     mountpath = "/test"
-    for i in range(0, len(keyvaluepair)):
+    for i in range(len(keyvaluepair)):
         key = list(keyvaluepair.keys())[i]
         if workloadwithconfigmapasvolume:
-            key_file_in_pod = mountpath + "/" + key
+            key_file_in_pod = f"{mountpath}/{key}"
             print(key_file_in_pod)
-            command = "cat " + key_file_in_pod + ''
+            command = f"cat {key_file_in_pod}"
             print(" Command to display configmap value from container is: ")
             print(command)
             result = kubectl_pod_exec(pod_list[0], command)
@@ -421,7 +421,7 @@ def validate_workload_with_configmap(p_client, workload,
             result = kubectl_pod_exec(pod_list[0], command)
             print(list(keyvaluepair.values())[i])
             if list(keyvaluepair.values())[i] in result.decode("utf-8"):
-                assert True
+                pass
 
 
 def delete_configmap(client, configmap, ns, keyvaluepair):
@@ -431,7 +431,6 @@ def delete_configmap(client, configmap, ns, keyvaluepair):
     client.delete(configmap)
     # Sleep to allow for the configmap to be deleted
     time.sleep(5)
-    timeout = 30
     configmapname = configmap.name
     print("Config Map list after deleting config map")
     configmapdict = client.list_configMap(name=configmapname)
@@ -440,16 +439,15 @@ def delete_configmap(client, configmap, ns, keyvaluepair):
         testdata = configmapdict.get('data')
         print("TESTDATA")
         print(testdata[0]['data'])
+        timeout = 30
         while key in testdata[0]['data']:
             if time.time() - start > timeout:
                 raise AssertionError("Timed out waiting for deletion")
             time.sleep(.5)
             configmapdict = client.list_configMap(name=configmapname)
             testdata = configmapdict.get('data')
-        assert True
-
     if len(configmapdict.get('data')) == 0:
-        assert True
+        pass
 
     # Verify configmap is deleted by "kubectl get configmap" command
     command = " get configmap " + configmap['name'] + " --namespace=" + ns.name
@@ -460,8 +458,6 @@ def delete_configmap(client, configmap, ns, keyvaluepair):
 
     print("Verify that the configmap does not exist "
           "and the error code returned is non zero ")
-    if result != 0:
-        assert True
 
 
 def create_and_validate_workload_with_configmap_as_volume(p_client, configmap,

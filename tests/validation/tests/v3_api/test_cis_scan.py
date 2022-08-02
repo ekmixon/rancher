@@ -237,7 +237,7 @@ def test_cis_scan_edit_cluster():
     client = get_user_client()
     cluster = cluster_detail["cluster_14"]
     # Add 2 etcd nodes to the cluster
-    for i in range(0, 2):
+    for i in range(2):
         aws_node = aws_nodes[3 + i]
         aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
         aws_node.execute_command("sudo sysctl -w kernel.panic=10")
@@ -268,7 +268,7 @@ def test_cis_scan_edit_cluster():
     assert report["results"][3]["checks"][18]["state"] == "mixed"
 
     # edit nodes and run command
-    for i in range(0, 2):
+    for i in range(2):
         aws_node = aws_nodes[3 + i]
         aws_node.execute_command("sudo useradd etcd")
 
@@ -358,7 +358,7 @@ def verify_cis_scan_report(
         report_link, token, test_total,
         tests_passed, tests_skipped,
         tests_failed, tests_na):
-    head = {'Authorization': 'Bearer ' + token}
+    head = {'Authorization': f'Bearer {token}'}
     response = requests.get(report_link, verify=False, headers=head)
     report = response.json()
     assert report["total"] == test_total, \
@@ -400,7 +400,7 @@ def wait_for_scan_active(cluster_scan_report_id,
     # wait until scan is active
     start = time.time()
     state_scan = scan_detail["state"]
-    while state_scan != "pass" and state_scan != "fail":
+    while state_scan not in ["pass", "fail"]:
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state of scan report to get to active")

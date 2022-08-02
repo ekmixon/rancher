@@ -10,9 +10,11 @@ from .test_rke_cluster_provisioning import rke_config
 # when installing Rancher into a k3s setup
 RANCHER_HA_KUBECONFIG = os.environ.get("RANCHER_HA_KUBECONFIG")
 RANCHER_HA_HOSTNAME = os.environ.get(
-    "RANCHER_HA_HOSTNAME", RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space")
+    "RANCHER_HA_HOSTNAME", f"{RANCHER_HOSTNAME_PREFIX}.qa.rancher.space"
+)
+
 resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
-RANCHER_SERVER_URL = "https://" + RANCHER_HA_HOSTNAME
+RANCHER_SERVER_URL = f"https://{RANCHER_HA_HOSTNAME}"
 
 RANCHER_CHART_VERSION = os.environ.get("RANCHER_CHART_VERSION")
 RANCHER_HELM_EXTRA_SETTINGS = os.environ.get("RANCHER_HELM_EXTRA_SETTINGS")
@@ -35,8 +37,8 @@ RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
 KUBERNETES_VERSION = os.environ.get("RANCHER_LOCAL_KUBERNETES_VERSION","")
 RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 
-kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
-export_cmd = "export KUBECONFIG=" + kubeconfig_path
+kubeconfig_path = f"{DATA_SUBDIR}/kube_config_cluster-ha-filled.yml"
+export_cmd = f"export KUBECONFIG={kubeconfig_path}"
 
 
 def test_remove_rancher_ha():
@@ -51,10 +53,12 @@ def test_remove_rancher_ha():
 
         # delete clusters except the local cluster
         clusters = client.list_cluster(id_ne="local").data
-        print("deleting the following clusters: {}"
-              .format([cluster.name for cluster in clusters]))
+        print(
+            f"deleting the following clusters: {[cluster.name for cluster in clusters]}"
+        )
+
         for cluster in clusters:
-            print("deleting the following cluster : {}".format(cluster.name))
+            print(f"deleting the following cluster : {cluster.name}")
             delete_cluster(client, cluster)
 
     resource_prefix = \
@@ -106,7 +110,7 @@ def test_install_rancher_ha(precheck_certificate_options):
 
     # wait until the cluster is ready
     def valid_response():
-        output = run_command_with_stderr(export_cmd + " && kubectl get nodes")
+        output = run_command_with_stderr(f"{export_cmd} && kubectl get nodes")
         return "Ready" in output.decode()
 
     try:
@@ -129,9 +133,8 @@ def test_install_rancher_ha(precheck_certificate_options):
         set_route53_with_eks_ingress()
     if RANCHER_LOCAL_CLUSTER_TYPE == "AKS":
         set_route53_with_aks_ingress()
-    wait_for_status_code(url=RANCHER_SERVER_URL + "/v3", expected_code=401)
-    auth_url = \
-        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
+    wait_for_status_code(url=f"{RANCHER_SERVER_URL}/v3", expected_code=401)
+    auth_url = f"{RANCHER_SERVER_URL}/v3-public/localproviders/local?action=login"
     wait_for_status_code(url=auth_url, expected_code=200)
     admin_client = set_url_and_password(RANCHER_SERVER_URL)
     cluster = get_cluster_by_name(admin_client, "local")
@@ -147,25 +150,26 @@ def create_custom_cluster(admin_client):
     wait_for_status_code(url=auth_url, expected_code=200)
     user, user_token = create_user(admin_client, auth_url)
 
-    aws_nodes = \
-        AmazonWebServices().create_multiple_nodes(
-            5, random_test_name(resource_prefix + "-custom"))
+    aws_nodes = AmazonWebServices().create_multiple_nodes(
+        5, random_test_name(f"{resource_prefix}-custom")
+    )
+
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
-    client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
-                            token=user_token, verify=False)
+    client = rancher.Client(
+        url=f"{RANCHER_SERVER_URL}/v3", token=user_token, verify=False
+    )
+
     cluster = client.create_cluster(
         name=random_name(),
         driver="rancherKubernetesEngine",
         rancherKubernetesEngineConfig=rke_config)
     assert cluster.state == "provisioning"
-    i = 0
-    for aws_node in aws_nodes:
+    for i, aws_node in enumerate(aws_nodes):
         docker_run_cmd = \
             get_custom_host_registration_cmd(
                 client, cluster, node_roles[i], aws_node)
         aws_node.execute_command(docker_run_cmd)
-        i += 1
     validate_cluster(client, cluster, userToken=user_token)
 
 
@@ -176,14 +180,14 @@ def test_upgrade_rancher_ha(precheck_upgrade_options):
 
 
 def create_resources_eks():
-    cluster_name = resource_prefix + "-ekscluster"
+    cluster_name = f"{resource_prefix}-ekscluster"
     AmazonWebServices().create_eks_cluster(cluster_name)
     AmazonWebServices().wait_for_eks_cluster_state(cluster_name, "ACTIVE")
 
 
 def create_resources():
     # Create nlb and grab ARN & dns name
-    lb = AmazonWebServices().create_network_lb(name=resource_prefix + "-nlb")
+    lb = AmazonWebServices().create_network_lb(name=f"{resource_prefix}-nlb")
     lbArn = lb["LoadBalancers"][0]["LoadBalancerArn"]
     lbDns = lb["LoadBalancers"][0]["DNSName"]
 
@@ -192,10 +196,14 @@ def create_resources():
                                                      lbDns)
 
     # Create the target groups
-    tg80 = AmazonWebServices(). \
-        create_ha_target_group(80, resource_prefix + "-tg-80")
-    tg443 = AmazonWebServices(). \
-        create_ha_target_group(443, resource_prefix + "-tg-443")
+    tg80 = AmazonWebServices().create_ha_target_group(
+        80, f"{resource_prefix}-tg-80"
+    )
+
+    tg443 = AmazonWebServices().create_ha_target_group(
+        443, f"{resource_prefix}-tg-443"
+    )
+
     tg80Arn = tg80["TargetGroups"][0]["TargetGroupArn"]
     tg443Arn = tg443["TargetGroups"][0]["TargetGroupArn"]
 
@@ -207,8 +215,10 @@ def create_resources():
                                                port=443,
                                                targetGroupARN=tg443Arn)
     targets = []
-    aws_nodes = AmazonWebServices().\
-        create_multiple_nodes(3, resource_prefix + "-server")
+    aws_nodes = AmazonWebServices().create_multiple_nodes(
+        3, f"{resource_prefix}-server"
+    )
+
     assert len(aws_nodes) == 3
 
     for aws_node in aws_nodes:
@@ -228,22 +238,29 @@ def install_cert_manager():
                 "{0}/cert-manager.crds.yaml".format(CERT_MANAGER_VERSION)
     cm_repo = "https://charts.jetstack.io"
 
-    run_command_with_stderr(export_cmd + " && kubectl apply -f " + manifests)
-    run_command_with_stderr("helm_v3 repo add jetstack " + cm_repo)
+    run_command_with_stderr(f"{export_cmd} && kubectl apply -f {manifests}")
+    run_command_with_stderr(f"helm_v3 repo add jetstack {cm_repo}")
     run_command_with_stderr("helm_v3 repo update")
-    run_command_with_stderr(export_cmd + " && " +
-                            "kubectl create namespace cert-manager")
-    run_command_with_stderr(export_cmd + " && " +
-                            "helm_v3 install cert-manager "
-                            "jetstack/cert-manager "
-                            "--namespace cert-manager "
-                            "--version {0}".format(CERT_MANAGER_VERSION))
+    run_command_with_stderr(
+        (f"{export_cmd} && " + "kubectl create namespace cert-manager")
+    )
+
+    run_command_with_stderr(
+        (
+            f"{export_cmd} && " + "helm_v3 install cert-manager "
+            "jetstack/cert-manager "
+            "--namespace cert-manager "
+            "--version {0}".format(CERT_MANAGER_VERSION)
+        )
+    )
+
     time.sleep(120)
 
 
 def install_eks_ingress():
-    run_command_with_stderr(export_cmd + " && kubectl apply -f " +
-                            DATA_SUBDIR + "/eks_nlb.yml")
+    run_command_with_stderr(
+        ((f"{export_cmd} && kubectl apply -f " + DATA_SUBDIR) + "/eks_nlb.yml")
+    )
 
 
 def set_route53_with_eks_ingress():
@@ -277,36 +294,47 @@ def set_route53_with_aks_ingress():
 
 
 def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
-    repo_name = "rancher-" + repo
-    repo_url = "https://releases.rancher.com/server-charts/" + repo
+    repo_name = f"rancher-{repo}"
+    repo_url = f"https://releases.rancher.com/server-charts/{repo}"
 
-    run_command_with_stderr("helm_v3 repo add " + repo_name + " " + repo_url)
+    run_command_with_stderr(f"helm_v3 repo add {repo_name} {repo_url}")
     run_command_with_stderr("helm_v3 repo update")
-    run_command_with_stderr(export_cmd + " && " +
-                            "kubectl create namespace cattle-system")
+    run_command_with_stderr(
+        (f"{export_cmd} && " + "kubectl create namespace cattle-system")
+    )
 
 
 def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
                     upgrade=False, extra_settings=None):
-    operation = "install"
+    operation = "upgrade" if upgrade else "install"
+    helm_rancher_cmd = (
+        (
+            (
+                (
+                    (
+                        (
+                            (
+                                (
+                                    f"{export_cmd} && helm_v3 {operation} rancher "
+                                    + "rancher-"
+                                )
+                                + repo
+                            )
+                            + "/rancher "
+                        )
+                        + "--version "
+                    )
+                    + RANCHER_CHART_VERSION
+                )
+                + " "
+            )
+            + "--namespace cattle-system "
+        )
+        + "--set hostname="
+    ) + RANCHER_HA_HOSTNAME
 
-    if upgrade:
-        operation = "upgrade"
 
-    helm_rancher_cmd = \
-        export_cmd + " && helm_v3 " + operation + " rancher " + \
-        "rancher-" + repo + "/rancher " + \
-        "--version " + RANCHER_CHART_VERSION + " " + \
-        "--namespace cattle-system " + \
-        "--set hostname=" + RANCHER_HA_HOSTNAME
-
-    if type == 'letsencrypt':
-        helm_rancher_cmd = \
-            helm_rancher_cmd + \
-            " --set ingress.tls.source=letsEncrypt " + \
-            "--set letsEncrypt.email=" + \
-            RANCHER_LETSENCRYPT_EMAIL
-    elif type == 'byo-self-signed':
+    if type == 'byo-self-signed':
         helm_rancher_cmd = \
             helm_rancher_cmd + \
             " --set ingress.tls.source=secret " + \
@@ -316,15 +344,22 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
             helm_rancher_cmd + \
             " --set ingress.tls.source=secret"
 
+    elif type == 'letsencrypt':
+        helm_rancher_cmd = \
+            helm_rancher_cmd + \
+            " --set ingress.tls.source=letsEncrypt " + \
+            "--set letsEncrypt.email=" + \
+            RANCHER_LETSENCRYPT_EMAIL
     if RANCHER_IMAGE_TAG != "" and RANCHER_IMAGE_TAG is not None:
         helm_rancher_cmd = \
             helm_rancher_cmd + \
             " --set rancherImageTag=" + RANCHER_IMAGE_TAG
 
-    if operation == "install":
-        if type == "byo-self-signed":
+    if type == "byo-self-signed":
+        if operation == "install":
             create_tls_secrets(valid_cert=False)
-        elif type == "byo-valid":
+    elif type == "byo-valid":
+        if operation == "install":
             create_tls_secrets(valid_cert=True)
 
     if RANCHER_HELM_EXTRA_SETTINGS:
@@ -332,7 +367,7 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
 
     if extra_settings:
         for setting in extra_settings:
-            helm_rancher_cmd = helm_rancher_cmd + " " + setting
+            helm_rancher_cmd = f"{helm_rancher_cmd} {setting}"
 
     run_command_with_stderr(helm_rancher_cmd)
     time.sleep(120)
@@ -346,9 +381,9 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
 
 
 def create_tls_secrets(valid_cert):
-    cert_path = DATA_SUBDIR + "/tls.crt"
-    key_path = DATA_SUBDIR + "/tls.key"
-    ca_path = DATA_SUBDIR + "/cacerts.pem"
+    cert_path = f"{DATA_SUBDIR}/tls.crt"
+    key_path = f"{DATA_SUBDIR}/tls.key"
+    ca_path = f"{DATA_SUBDIR}/cacerts.pem"
 
     if valid_cert:
         # write files from env var
@@ -373,22 +408,22 @@ def create_tls_secrets(valid_cert):
 
 
 def write_encoded_certs(path, contents):
-    file = open(path, "w")
-    file.write(base64.b64decode(contents).decode("utf-8"))
-    file.close()
+    with open(path, "w") as file:
+        file.write(base64.b64decode(contents).decode("utf-8"))
 
 
 def write_kubeconfig():
-    file = open(kubeconfig_path, "w")
-    file.write(base64.b64decode(RANCHER_HA_KUBECONFIG).decode("utf-8"))
-    file.close()
+    with open(kubeconfig_path, "w") as file:
+        file.write(base64.b64decode(RANCHER_HA_KUBECONFIG).decode("utf-8"))
 
 
 def set_url_and_password(rancher_url, server_url=None):
     admin_token = set_url_password_token(rancher_url, server_url)
-    admin_client = rancher.Client(url=rancher_url + "/v3",
-                                  token=admin_token, verify=False)
-    auth_url = rancher_url + "/v3-public/localproviders/local?action=login"
+    admin_client = rancher.Client(
+        url=f"{rancher_url}/v3", token=admin_token, verify=False
+    )
+
+    auth_url = f"{rancher_url}/v3-public/localproviders/local?action=login"
     user, user_token = create_user(admin_client, auth_url)
     env_details = "env.CATTLE_TEST_URL='" + rancher_url + "'\n"
     env_details += "env.ADMIN_TOKEN='" + admin_token + "'\n"
@@ -398,35 +433,53 @@ def set_url_and_password(rancher_url, server_url=None):
 
 
 def create_rke_cluster(config_path):
-    rke_cmd = "rke --version && rke up --config " + config_path
+    rke_cmd = f"rke --version && rke up --config {config_path}"
     run_command_with_stderr(rke_cmd)
 
 
 def check_rke_ingress_rollout():
     rke_version = run_command_with_stderr('rke -v | cut -d " " -f 3')
     rke_version = ''.join(rke_version.decode('utf-8').split())
-    print("RKE VERSION: " + rke_version)
-    k8s_version = run_command_with_stderr(export_cmd + " && " +
-                                          'kubectl version --short | grep -i server | cut -d " " -f 3')
+    print(f"RKE VERSION: {rke_version}")
+    k8s_version = run_command_with_stderr(
+        (
+            f"{export_cmd} && "
+            + 'kubectl version --short | grep -i server | cut -d " " -f 3'
+        )
+    )
+
     k8s_version = ''.join(k8s_version.decode('utf-8').split())
-    print("KUBERNETES VERSION: " + k8s_version)
-    if packaging.version.parse(rke_version) > packaging.version.parse("v1.2"):
-        if packaging.version.parse(k8s_version) >= packaging.version.parse("v1.21"):
-            run_command_with_stderr(
-                export_cmd + " && " +
-                "kubectl -n ingress-nginx rollout status ds/nginx-ingress-controller")
-            run_command_with_stderr(
-                export_cmd + " && " +
-                "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-create")
-            run_command_with_stderr(
-                export_cmd + " && " +
-                "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-patch")
+    print(f"KUBERNETES VERSION: {k8s_version}")
+    if packaging.version.parse(rke_version) > packaging.version.parse(
+        "v1.2"
+    ) and packaging.version.parse(k8s_version) >= packaging.version.parse(
+        "v1.21"
+    ):
+        run_command_with_stderr(
+            (
+                f"{export_cmd} && "
+                + "kubectl -n ingress-nginx rollout status ds/nginx-ingress-controller"
+            )
+        )
+
+        run_command_with_stderr(
+            (
+                f"{export_cmd} && "
+                + "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-create"
+            )
+        )
+
+        run_command_with_stderr(
+            (
+                f"{export_cmd} && "
+                + "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-patch"
+            )
+        )
 
 
 def print_kubeconfig():
-    kubeconfig_file = open(kubeconfig_path, "r")
-    kubeconfig_contents = kubeconfig_file.read()
-    kubeconfig_file.close()
+    with open(kubeconfig_path, "r") as kubeconfig_file:
+        kubeconfig_contents = kubeconfig_file.read()
     kubeconfig_contents_encoded = base64.b64encode(
         kubeconfig_contents.encode("utf-8")).decode("utf-8")
     print("\n\n" + kubeconfig_contents + "\n\n")
@@ -456,16 +509,15 @@ def create_rke_cluster_config(aws_nodes):
     rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", KUBERNETES_VERSION)
     print("cluster-ha-filled.yml: \n" + rkeconfig + "\n")
 
-    clusterfilepath = DATA_SUBDIR + "/" + "cluster-ha-filled.yml"
+    clusterfilepath = f"{DATA_SUBDIR}/cluster-ha-filled.yml"
 
-    f = open(clusterfilepath, "w")
-    f.write(rkeconfig)
-    f.close()
+    with open(clusterfilepath, "w") as f:
+        f.write(rkeconfig)
     return clusterfilepath
 
 
 def create_aks_cluster():
-    tf_dir = DATA_SUBDIR + "/" + "terraform/aks"
+    tf_dir = f"{DATA_SUBDIR}/terraform/aks"
     aks_k8_s_version = os.environ.get('RANCHER_AKS_K8S_VERSION', '')
     aks_location = os.environ.get('RANCHER_AKS_LOCATION', '')
     client_id = os.environ.get('ARM_CLIENT_ID', '')
@@ -490,8 +542,9 @@ def create_aks_cluster():
 
 
 def install_aks_ingress():
-    run_command_with_stderr(export_cmd + " && kubectl apply -f " +
-                            DATA_SUBDIR + "/aks_nlb.yml")
+    run_command_with_stderr(
+        ((f"{export_cmd} && kubectl apply -f " + DATA_SUBDIR) + "/aks_nlb.yml")
+    )
 
 
 @pytest.fixture(scope='module')

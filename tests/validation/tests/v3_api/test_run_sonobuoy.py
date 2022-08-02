@@ -14,7 +14,7 @@ DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
 
 def test_sonobuoy_results():
     config = base64.b64decode(RANCHER_KUBECONFIG).decode("utf-8")
-    kubeconfig = DATA_SUBDIR + "/config"
+    kubeconfig = f"{DATA_SUBDIR}/config"
     print(kubeconfig)
 
     with open(kubeconfig, 'w') as f:
@@ -26,10 +26,16 @@ def test_sonobuoy_results():
 
 
 def run_sonobuoy_test(kubeconfig):
-    if not RANCHER_FAILED_TEST:
-        cmd = "sonobuoy run --mode={0} --kube-conformance-image-version={1} --kubeconfig={2}".format(RANCHER_SONOBUOY_MODE, RANCHER_K8S_VERSION, kubeconfig)
-    else:
-       cmd = "sonobuoy run {0} --kube-conformance-image-version={1} --kubeconfig={2}".format(RANCHER_FAILED_TEST, RANCHER_K8S_VERSION, kubeconfig)
+    cmd = (
+        "sonobuoy run {0} --kube-conformance-image-version={1} --kubeconfig={2}".format(
+            RANCHER_FAILED_TEST, RANCHER_K8S_VERSION, kubeconfig
+        )
+        if RANCHER_FAILED_TEST
+        else "sonobuoy run --mode={0} --kube-conformance-image-version={1} --kubeconfig={2}".format(
+            RANCHER_SONOBUOY_MODE, RANCHER_K8S_VERSION, kubeconfig
+        )
+    )
+
     status = run_command(cmd)
     time.sleep(60)
 

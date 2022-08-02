@@ -33,14 +33,10 @@ def create_and_validate_gke_cluster(name, version, credential_data):
 def get_gke_version_credentials(multiple_versions=False):
     credfilename = "credential.txt"
     PATH = os.path.dirname(os.path.realpath(__file__))
-    credfilepath = PATH + "/" + credfilename
+    credfilepath = f"{PATH}/{credfilename}"
 
-    # The json GKE credentials file is being written to a file and then re-read
-
-    f = open(credfilepath, "w")
-    f.write(CREDENTIALS)
-    f.close()
-
+    with open(credfilepath, "w") as f:
+        f.write(CREDENTIALS)
     credentialdata = readDataFile(os.path.dirname(os.path.realpath(__file__)) +
                                   "/", credfilename)
     print(credentialdata)
@@ -51,11 +47,14 @@ def get_gke_version_credentials(multiple_versions=False):
             "zone": "us-central1-f",
             "projectId": "rancher-qa"
         }
-        headers = {"Content-Type": "application/json",
-                   "Accept": "application/json",
-                   "Authorization": "Bearer " + USER_TOKEN}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {USER_TOKEN}",
+        }
 
-        gke_version_url = CATTLE_TEST_URL + "/meta/gkeVersions"
+
+        gke_version_url = f"{CATTLE_TEST_URL}/meta/gkeVersions"
         print(gke_version_url)
         response = requests.post(gke_version_url, json=data_test,
                                  verify=False, headers=headers)
@@ -78,8 +77,7 @@ def get_gke_version_credentials(multiple_versions=False):
 
 def get_gke_config(name, version, credential_data):
 
-    # Get GKE configuration
-    gke_config = {
+    return {
         "googleKubernetesEngineConfig": {
             "diskSizeGb": 100,
             "enableAlphaFeature": False,
@@ -98,10 +96,7 @@ def get_gke_config(name, version, credential_data):
             "clusterIpv4Cidr": " ",
             "credential": credential_data,
             "projectId": "rancher-qa",
-
         },
         "name": name,
-        "type": "cluster"
+        "type": "cluster",
     }
-
-    return gke_config

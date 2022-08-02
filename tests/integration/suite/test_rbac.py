@@ -49,7 +49,7 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     # access it
     wait_until_available(user_client, admin_cc.cluster)
 
-    proj_name = 'test-' + random_str()
+    proj_name = f'test-{random_str()}'
 
     def can_create_project():
         try:
@@ -91,8 +91,7 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     wait_for(can_create_ns)
 
     c_client = cluster_and_client('local', user_mc.client)[1]
-    ns = c_client.create_namespace(name='test-' + random_str(),
-                                   projectId=proj.id)
+    ns = c_client.create_namespace(name=f'test-{random_str()}', projectId=proj.id)
     ns = wait_until_available(c_client, ns)
     ns = c_client.wait_success(ns)
     assert ns.state == 'active'
@@ -247,13 +246,15 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     wait_until_available(user_mc.client, admin_cc.cluster)
 
     split = str.split(prtb.id, ":")
-    prtb_key = split[0] + "_" + split[1]
+    prtb_key = f"{split[0]}_{split[1]}"
     api_instance = kubernetes.client.RbacAuthorizationV1Api(
         admin_mc.k8s_client)
 
     def crb_created():
         crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb_key + "=" + mbo)
+            label_selector=f"{prtb_key}={mbo}"
+        )
+
         return len(crbs.items) == 1
 
     # Find the expected k8s clusterRoleBinding
@@ -268,7 +269,9 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
 
     def crb_deleted():
         crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb_key + "=" + mbo)
+            label_selector=f"{prtb_key}={mbo}"
+        )
+
         return len(crbs.items) == 0
 
     wait_for(crb_deleted,
@@ -321,11 +324,13 @@ def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
         admin_mc.k8s_client)
 
     split = str.split(prtb.id, ":")
-    prtb_key = split[0]+"_"+split[1]
+    prtb_key = f"{split[0]}_{split[1]}"
 
     def crb_created():
         crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb_key + "=" + mbo)
+            label_selector=f"{prtb_key}={mbo}"
+        )
+
         return len(crbs.items) == 1
 
     # Find the expected k8s clusterRoleBinding
@@ -334,7 +339,9 @@ def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
                                   "get created", timeout=120)
 
     crbs = api_instance.list_cluster_role_binding(
-        label_selector=prtb_key + "=" + mbo)
+        label_selector=f"{prtb_key}={mbo}"
+    )
+
 
     assert len(crbs.items) == 1
 
@@ -345,7 +352,9 @@ def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
 
     def crb_label_updated():
         crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb.uuid + "=" + mbo_legacy)
+            label_selector=f"{prtb.uuid}={mbo_legacy}"
+        )
+
         return len(crbs.items) == 1
 
     wait_for(crb_label_updated,
@@ -358,9 +367,13 @@ def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
 
     def crb_callback():
         crbs_listed_with_new_label = api_instance.list_cluster_role_binding(
-            label_selector=prtb_key + "=" + mbo)
+            label_selector=f"{prtb_key}={mbo}"
+        )
+
         crbs_listed_with_old_label = api_instance.list_cluster_role_binding(
-            label_selector=prtb.uuid + "=" + mbo_legacy)
+            label_selector=f"{prtb.uuid}={mbo_legacy}"
+        )
+
         return len(crbs_listed_with_new_label.items) == 0 and\
             len(crbs_listed_with_old_label.items) == 0
 
@@ -606,21 +619,24 @@ def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_mc,
     wait_for_template_to_be_created(admin_mc.client, "library")
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
+        name=f"prtb-{random_str()}",
         userId=user.user.id,
         projectId=project.id,
-        roleTemplateId="read-only")
+        roleTemplateId="read-only",
+    )
+
     remove_resource(prtb)
 
     wait_until_available(user.client, project)
 
     app = client.create_app(
-        name="app-" + random_str(),
+        name=f"app-{random_str()}",
         externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
-                   "namespace=cattle-global-data",
+        "namespace=cattle-global-data",
         targetNamespace=ns.name,
-        projectId=project.id
+        projectId=project.id,
     )
+
 
     with pytest.raises(ApiError) as e:
         user.client.action(obj=app, action_name="upgrade",
@@ -650,30 +666,31 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
     wait_for_template_to_be_created(admin_mc.client, "library")
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="test-" + random_str(),
+        name=f"test-{random_str()}",
         userId=user.user.id,
         projectId=project.id,
-        roleTemplateId="project-owner")
+        roleTemplateId="project-owner",
+    )
+
     remove_resource(prtb)
 
     wait_until_available(user.client, project)
 
     app = client.create_app(
-        name="test-" + random_str(),
+        name=f"test-{random_str()}",
         externalId="catalog://?catalog=library&template"
-                   "=mysql&version=1.3.1&"
-                   "namespace=cattle-global-data",
+        "=mysql&version=1.3.1&"
+        "namespace=cattle-global-data",
         targetNamespace=ns.name,
-        projectId=project.id
+        projectId=project.id,
     )
+
 
     # if upgrade is performed prior to installing state,
     # it may return a modified error
     def is_installing():
         current_state = client.reload(app)
-        if current_state.state == "installing":
-            return True
-        return False
+        return current_state.state == "installing"
 
     try:
         wait_for(is_installing)
@@ -691,6 +708,7 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
     def _app_revisions_exist():
         a = admin_pc.client.reload(app)
         return len(a.revision().data) > 0
+
     wait_for(_app_revisions_exist, timeout=60,
              fail_handler=lambda: 'no revisions exist')
     proj_user_client = user_project_client(user_mc, project)
@@ -713,11 +731,12 @@ def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
     user_client = user_mc.client
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
+        name=f"prtb-{random_str()}",
         userId=user_mc.user.id,
         projectId=project.id,
-        roleTemplateId="read-only"
+        roleTemplateId="read-only",
     )
+
     remove_resource(prtb)
 
     wait_until_available(user_client, project)
@@ -727,19 +746,15 @@ def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
     # readonly should failed to create a regular secret
     with pytest.raises(ApiError) as e:
         proj_user_client.create_secret(
-            name="test-" + random_str(),
-            stringData={
-                'abc': '123'
-            }
+            name=f"test-{random_str()}", stringData={'abc': '123'}
         )
+
     assert e.value.error.status == 403
 
     secret = admin_pc.client.create_secret(
-        name="test-" + random_str(),
-        stringData={
-            'abc': '123'
-        }
+        name=f"test-{random_str()}", stringData={'abc': '123'}
     )
+
     remove_resource(secret)
 
     wait_until_available(admin_pc.client, secret)
@@ -755,29 +770,27 @@ def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
     assert e.value.error.status == 404
 
     ns = admin_pc.cluster.client.create_namespace(
-        name='test-' + random_str(),
-        projectId=project.id
+        name=f'test-{random_str()}', projectId=project.id
     )
+
     remove_resource(ns)
 
     # readonly should fail to create ns secret
     with pytest.raises(ApiError) as e:
         proj_user_client.create_namespaced_secret(
             namespaceId=ns.id,
-            name="test-" + random_str(),
-            stringData={
-                'abc': '123'
-            }
+            name=f"test-{random_str()}",
+            stringData={'abc': '123'},
         )
+
     assert e.value.error.status == 403
 
     ns_secret = admin_pc.client.create_namespaced_secret(
         namespaceId=ns.id,
-        name="test-" + random_str(),
-        stringData={
-            'abc': '123'
-        }
+        name=f"test-{random_str()}",
+        stringData={'abc': '123'},
     )
+
     remove_resource(ns_secret)
 
     wait_until_available(admin_pc.client, ns_secret)
@@ -803,17 +816,18 @@ def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
     user_client = user_mc.client
 
     ns = admin_pc.cluster.client.create_namespace(
-        name='test-' + random_str(),
-        projectId=project.id
+        name=f'test-{random_str()}', projectId=project.id
     )
+
     remove_resource(ns)
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
+        name=f"prtb-{random_str()}",
         userId=user_mc.user.id,
         projectId=project.id,
-        roleTemplateId="project-member"
+        roleTemplateId="project-member",
     )
+
 
     remove_resource(prtb)
 
@@ -824,11 +838,9 @@ def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
     def try_create_secret():
         try:
             return proj_user_client.create_secret(
-                name="secret-" + random_str(),
-                stringData={
-                    'abc': '123'
-                }
+                name=f"secret-{random_str()}", stringData={'abc': '123'}
             )
+
         except ApiError as e:
             assert e.error.status == 403
         return False
@@ -848,12 +860,11 @@ def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
     def try_create_ns_secret():
         try:
             return proj_user_client.create_namespaced_secret(
-                name="secret-" + random_str(),
+                name=f"secret-{random_str()}",
                 namespaceId=ns.id,
-                stringData={
-                    "abc": "123"
-                }
+                stringData={"abc": "123"},
             )
+
 
         except ApiError as e:
             assert e.error.status == 403
@@ -881,16 +892,16 @@ def test_readonly_cannot_move_namespace(
     namespace and then moves NS across.
     """
     p1 = admin_mc.client.create_project(
-        name='test-' + random_str(),
-        clusterId=admin_cc.cluster.id
+        name=f'test-{random_str()}', clusterId=admin_cc.cluster.id
     )
+
     remove_resource(p1)
     p1 = admin_cc.management.client.wait_success(p1)
 
     p2 = admin_mc.client.create_project(
-        name='test-' + random_str(),
-        clusterId=admin_cc.cluster.id
+        name=f'test-{random_str()}', clusterId=admin_cc.cluster.id
     )
+
     remove_resource(p2)
     p2 = admin_mc.client.wait_success(p2)
 
@@ -900,17 +911,21 @@ def test_readonly_cannot_move_namespace(
     wait_until(cluster_has_namespace(k8s_client, p2.id.split(":")[1]))
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
+        name=f"prtb-{random_str()}",
         userId=user_mc.user.id,
         projectId=p1.id,
-        roleTemplateId="read-only")
+        roleTemplateId="read-only",
+    )
+
     remove_resource(prtb)
 
     prtb2 = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
+        name=f"prtb-{random_str()}",
         userId=user_mc.user.id,
         projectId=p2.id,
-        roleTemplateId="read-only")
+        roleTemplateId="read-only",
+    )
+
     remove_resource(prtb2)
 
     wait_until_available(user_mc.client, p1)

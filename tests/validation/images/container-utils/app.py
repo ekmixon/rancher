@@ -7,7 +7,7 @@ from string import ascii_letters, digits
 from subprocess import call
 
 
-TEMP_DIR = os.path.dirname(os.path.realpath(__file__)) + '/temp'
+TEMP_DIR = f'{os.path.dirname(os.path.realpath(__file__))}/temp'
 app = Flask(__name__)
 
 
@@ -24,14 +24,16 @@ def home():
 def get_metadata(path):
     accept_type = request.headers.get('Accept')
     headers = {'Accept': accept_type} if accept_type else None
-    url = "http://rancher-metadata/%s" % path
+    url = f"http://rancher-metadata/{path}"
     try:
         response = requests.get(url=url, headers=headers)
     except Exception as e:
         return "Error: {0}".format(e), 400
-    if not response.ok:
-        return response.content, response.status_code
-    return response.content, 200
+    return (
+        (response.content, 200)
+        if response.ok
+        else (response.content, response.status_code)
+    )
 
 
 @app.route('/hostname', methods=['GET'])
@@ -59,8 +61,8 @@ def proxy():
 
     if link is not None and port is not None and path is not None:
         link = link.upper()
-        dest_port = os.environ.get(link + "_PORT_" + port + "_TCP_PORT")
-        dest_host = os.environ.get(link + "_PORT_" + port + "_TCP_ADDR")
+        dest_port = os.environ.get(f"{link}_PORT_{port}_TCP_PORT")
+        dest_host = os.environ.get(f"{link}_PORT_{port}_TCP_ADDR")
         err_msg = "Not found '{0}' in environment variables"
         if dest_port is None:
             return err_msg.format(dest_port), 404
@@ -75,9 +77,11 @@ def proxy():
         response = requests.get(url=url)
     except Exception as e:
         return "Error: {0}".format(e), 400
-    if not response.ok:
-        return response.content, response.status_code
-    return response.content, 200
+    return (
+        (response.content, 200)
+        if response.ok
+        else (response.content, response.status_code)
+    )
 
 
 @app.route('/dig', methods=['GET'])

@@ -23,10 +23,10 @@ class RKEClient(object):
         self.master_ssh_key_path = master_ssh_key_path
         self.template_path = template_path
         self._working_dir = tempfile.mkdtemp()
-        self._hide = False if DEBUG.lower() == 'true' else True
+        self._hide = DEBUG.lower() != 'true'
 
     def _run(self, command):
-        print('Running command: {}'.format(command))
+        print(f'Running command: {command}')
         start_time = time.time()
         result = self.run_command('cd {0} && {1}'.format(self._working_dir,
                                                          command))
@@ -36,7 +36,7 @@ class RKEClient(object):
         return result
 
     def up(self, config_yml, config=None):
-        yml_name = config if config else DEFAULT_CONFIG_NAME
+        yml_name = config or DEFAULT_CONFIG_NAME
         self._save_cluster_yml(yml_name, config_yml)
         cli_args = '' if config is None else ' --config {0}'.format(config)
         result = self._run("rke up {0}".format(cli_args))
@@ -45,8 +45,7 @@ class RKEClient(object):
         return result
 
     def remove(self, config=None):
-        result = self._run("rke remove --force")
-        return result
+        return self._run("rke remove --force")
 
     def build_rke_template(self, template, nodes, **kwargs):
         """
@@ -56,24 +55,21 @@ class RKEClient(object):
         render_dict = {
             'master_ssh_key_path': self.master_ssh_key_path,
             'network_plugin': DEFAULT_NETWORK_PLUGIN,
-            'k8s_version': K8S_VERSION
-        }
-        render_dict.update(kwargs)  # will up master_key if passed in
-        node_index = 0
-        for node in nodes:
+            'k8s_version': K8S_VERSION,
+        } | kwargs
+
+        for node_index, node in enumerate(nodes):
             node_dict = {
-                'ssh_user_{}'.format(node_index): node.ssh_user,
-                'ip_address_{}'.format(node_index): node.public_ip_address,
-                'dns_hostname_{}'.format(node_index): node.host_name,
-                'ssh_key_path_{}'.format(node_index): node.ssh_key_path,
-                'ssh_key_{}'.format(node_index): node.ssh_key,
-                'internal_address_{}'.format(node_index):
-                    node.private_ip_address,
-                'hostname_override_{}'.format(node_index):
-                    node.node_name
+                f'ssh_user_{node_index}': node.ssh_user,
+                f'ip_address_{node_index}': node.public_ip_address,
+                f'dns_hostname_{node_index}': node.host_name,
+                f'ssh_key_path_{node_index}': node.ssh_key_path,
+                f'ssh_key_{node_index}': node.ssh_key,
+                f'internal_address_{node_index}': node.private_ip_address,
+                f'hostname_override_{node_index}': node.node_name,
             }
-            render_dict.update(node_dict)
-            node_index += 1
+
+            render_dict |= node_dict
         yml_contents = jinja2.Environment(
             loader=jinja2.FileSystemLoader(self.template_path)
         ).get_template(template).render(render_dict)
@@ -95,7 +91,7 @@ class RKEClient(object):
         for dict_node in yml_dict['nodes']:
             for node in nodes:
                 if node.public_ip_address == dict_node['address'] or \
-                        node.host_name == dict_node['address']:
+                            node.host_name == dict_node['address']:
                     # dep
                     node.host_name = dict_node['address']
                     if dict_node.get('hostname_override'):
@@ -113,22 +109,21 @@ class RKEClient(object):
         return nodes
 
     def _save_cluster_yml(self, yml_name, yml_contents):
-        file_path = "{}/{}".format(self._working_dir, yml_name)
+        file_path = f"{self._working_dir}/{yml_name}"
         with open(file_path, 'w') as f:
             f.write(yml_contents)
 
     def get_kube_config_for_config(self, yml_name=DEFAULT_CONFIG_NAME):
-        file_path = "{}/kube_config_{}".format(self._working_dir, yml_name)
+        file_path = f"{self._working_dir}/kube_config_{yml_name}"
         with open(file_path, 'r') as f:
             kube_config = f.read()
         return kube_config
 
     def kube_config_path(self, yml_name=DEFAULT_CONFIG_NAME):
-        return os.path.abspath(
-            "{}/kube_config_{}".format(self._working_dir, yml_name))
+        return os.path.abspath(f"{self._working_dir}/kube_config_{yml_name}")
 
     def save_kube_config_locally(self, yml_name=DEFAULT_CONFIG_NAME):
-        file_name = 'kube_config_{}'.format(yml_name)
+        file_name = f'kube_config_{yml_name}'
         contents = self.get_kube_config_for_config(yml_name)
         with open(file_name, 'w') as f:
             f.write(contents)

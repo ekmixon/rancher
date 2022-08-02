@@ -143,7 +143,7 @@ def check_subject_in_rb(rbac, ns, subject_id, name):
     rbs = rbac.list_namespaced_role_binding(ns)
     for rb in rbs.items:
         if rb.metadata.name == name:
-            for i in range(0, len(rb.subjects)):
+            for i in range(len(rb.subjects)):
                 if rb.subjects[i].name == subject_id:
                     return True
     return False
